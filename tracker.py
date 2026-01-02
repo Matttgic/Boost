@@ -1,24 +1,25 @@
 import requests
+from bs4 import BeautifulSoup
 import csv
 import os
 from datetime import datetime
 
-def track_and_save():
-    api_url = "https://www.winamax.fr/paris-sportifs/api/sports/100000"
+def track_transfermarkt():
+    # URL de Transfermarkt qui liste les boosts Winamax
+    url = "https://www.transfermarkt.fr/paris-sportifs/cotes-boostees"
     file_name = "historique_boosts.csv"
     
-    # Headers pour simuler un navigateur mobile
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
+
     try:
-        response = requests.get(api_url, headers=headers)
-        response.raise_for_status() # Vérifie si la requête a réussi
-        data = response.json()
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
         
-        matches = data.get('matches', {})
-        outcomes = data.get('outcomes', {})
+        # On cherche les lignes de boosts (le sélecteur dépend de leur structure)
+        # Note : On cible Winamax spécifiquement dans la liste
+        boost_rows = soup.find_all('div', class_='bet-boost-row') # Exemple de classe
         
         existing_data = set()
         if os.path.isfile(file_name):
@@ -29,29 +30,20 @@ def track_and_save():
                     if len(row) >= 4:
                         existing_data.add((row[1], row[2], row[3]))
 
-        file_exists = os.path.isfile(file_name)
         new_entries = 0
-        
         with open(file_name, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            if not file_exists:
+            if not os.path.isfile(file_name) or os.stat(file_name).st_size == 0:
                 writer.writerow(['Date', 'Match', 'Pari', 'Cote'])
 
-            for match in matches.values():
-                match_name = match.get('title')
-                for outcome_id in match.get('mainMarketOutcomes', []):
-                    outcome = outcomes.get(str(outcome_id))
-                    if outcome:
-                        pari = outcome.get('label')
-                        cote = str(outcome.get('odds'))
-                        if (match_name, pari, cote) not in existing_data:
-                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M"), match_name, pari, cote])
-                            new_entries += 1
-        
-        print(f"{new_entries} nouvelles cotes ajoutées.")
+            # Ici on simule l'extraction (à adapter selon le code HTML exact de TM)
+            # Pour l'instant, on va juste logger qu'on a réussi à lire la page
+            if response.status_code == 200:
+                print("Accès à Transfermarkt réussi !")
+                # Si tu vois ce message dans les logs, on affinera le sélecteur HTML
         
     except Exception as e:
         print(f"Erreur : {e}")
 
 if __name__ == "__main__":
-    track_and_save()
+    track_transfermarkt()
