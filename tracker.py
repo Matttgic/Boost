@@ -16,8 +16,9 @@ def track_all_boosts():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Sélection des blocs de boosts
-        boost_items = soup.select('.bet-boost-item') 
+        # Correction des sélecteurs basés sur tes screenshots
+        # On cherche les cartes blanches qui contiennent les paris
+        boost_items = soup.select('div[style*="background-color: rgb(255, 255, 255)"]') 
         
         existing_data = set()
         if os.path.isfile(file_name):
@@ -26,7 +27,6 @@ def track_all_boosts():
                 next(reader, None)
                 for row in reader:
                     if len(row) >= 5:
-                        # On stocke : Bookmaker + Match + Pari + Cote
                         existing_data.add((row[1], row[2], row[3], row[4]))
 
         new_entries = 0
@@ -39,33 +39,32 @@ def track_all_boosts():
 
             for item in boost_items:
                 try:
-                    # Extraction des données
-                    match = item.select_one('.bet-boost-event').text.strip()
-                    pari = item.select_one('.bet-boost-market').text.strip()
-                    cote = item.select_one('.bet-boost-odds').text.strip().replace('Cote', '').strip()
+                    # On récupère le texte principal (ex: "Toulouse - Lens : Florian Thauvin...")
+                    full_text = item.find('h3').text.strip() if item.find('h3') else item.text.strip()
                     
-                    # On devine le bookmaker via l'image ou le texte
-                    bookmaker = "Inconnu"
-                    img_alt = item.select_one('img')['alt'].lower() if item.select_one('img') else ""
-                    if "winamax" in img_alt or "winamax" in str(item).lower(): bookmaker = "Winamax"
-                    elif "unibet" in img_alt or "unibet" in str(item).lower(): bookmaker = "Unibet"
-                    elif "betclic" in img_alt or "betclic" in str(item).lower(): bookmaker = "Betclic"
-                    elif "pmu" in img_alt or "pmu" in str(item).lower(): bookmaker = "PMU"
-                    elif "parions" in img_alt or "parions" in str(item).lower(): bookmaker = "ParionsSport"
-                    
-                    if (bookmaker, match, pari, cote) not in existing_data:
-                        writer.writerow([
-                            datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            bookmaker,
-                            match,
-                            pari,
-                            cote
-                        ])
-                        new_entries += 1
-                except:
+                    if "Cote" in full_text:
+                        # On sépare le match/pari de la cote
+                        parts = full_text.split("Cote")
+                        match_pari = parts[0].strip().strip(':')
+                        cote = parts[1].strip()
+                        
+                        # Identification du bookmaker par l'image
+                        img = item.find('img')
+                        bookmaker = img['alt'] if img and img.has_attr('alt') else "Inconnu"
+                        
+                        if (bookmaker, "Match", match_pari, cote) not in existing_data:
+                            writer.writerow([
+                                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                bookmaker,
+                                "Voir Pari", # Le match est mélangé dans le texte sur TM
+                                match_pari,
+                                cote
+                            ])
+                            new_entries += 1
+                except Exception as e:
                     continue
         
-        print(f"Succès : {new_entries} nouveaux boosts ajoutés.")
+        print(f"Succès : {new_entries} nouveaux boosts détectés.")
         
     except Exception as e:
         print(f"Erreur : {e}")
