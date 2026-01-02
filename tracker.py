@@ -16,9 +16,9 @@ def track_all_boosts():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Correction des sélecteurs basés sur tes screenshots
-        # On cherche les cartes blanches qui contiennent les paris
-        boost_items = soup.select('div[style*="background-color: rgb(255, 255, 255)"]') 
+        # On cherche tous les blocs de texte qui contiennent "Cote"
+        # C'est la méthode la plus sûre par rapport à tes screens
+        all_texts = soup.find_all(text=True)
         
         existing_data = set()
         if os.path.isfile(file_name):
@@ -37,32 +37,31 @@ def track_all_boosts():
             if not file_exists:
                 writer.writerow(['Date', 'Bookmaker', 'Match', 'Pari', 'Cote'])
 
-            for item in boost_items:
-                try:
-                    # On récupère le texte principal (ex: "Toulouse - Lens : Florian Thauvin...")
-                    full_text = item.find('h3').text.strip() if item.find('h3') else item.text.strip()
-                    
-                    if "Cote" in full_text:
-                        # On sépare le match/pari de la cote
-                        parts = full_text.split("Cote")
-                        match_pari = parts[0].strip().strip(':')
-                        cote = parts[1].strip()
-                        
-                        # Identification du bookmaker par l'image
-                        img = item.find('img')
+            for text in all_texts:
+                if "Cote" in text and len(text) > 10:
+                    try:
+                        # On nettoie le texte (ex: "Toulouse - Lens : ... Cote 3.25")
+                        clean_text = text.strip().replace('\n', ' ')
+                        parts = clean_text.split("Cote")
+                        pari_complet = parts[0].strip().strip(':')
+                        cote_valeur = parts[1].strip()
+
+                        # On cherche le bookmaker autour du texte
+                        parent = text.parent.parent.parent
+                        img = parent.find('img')
                         bookmaker = img['alt'] if img and img.has_attr('alt') else "Inconnu"
-                        
-                        if (bookmaker, "Match", match_pari, cote) not in existing_data:
+
+                        if (bookmaker, "Boost", pari_complet, cote_valeur) not in existing_data:
                             writer.writerow([
                                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 bookmaker,
-                                "Voir Pari", # Le match est mélangé dans le texte sur TM
-                                match_pari,
-                                cote
+                                "Boost",
+                                pari_complet,
+                                cote_valeur
                             ])
                             new_entries += 1
-                except Exception as e:
-                    continue
+                    except:
+                        continue
         
         print(f"Succès : {new_entries} nouveaux boosts détectés.")
         
