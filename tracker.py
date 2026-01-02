@@ -5,7 +5,6 @@ import os
 from datetime import datetime
 
 def track_transfermarkt():
-    # URL de Transfermarkt qui liste les boosts Winamax
     url = "https://www.transfermarkt.fr/paris-sportifs/cotes-boostees"
     file_name = "historique_boosts.csv"
     
@@ -17,9 +16,9 @@ def track_transfermarkt():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # On cherche les lignes de boosts (le sélecteur dépend de leur structure)
-        # Note : On cible Winamax spécifiquement dans la liste
-        boost_rows = soup.find_all('div', class_='bet-boost-row') # Exemple de classe
+        # On cible les conteneurs de boosts Winamax
+        # Note : On cherche les div qui contiennent le logo Winamax ou le texte associé
+        boost_items = soup.select('.bet-boost-item') 
         
         existing_data = set()
         if os.path.isfile(file_name):
@@ -31,16 +30,34 @@ def track_transfermarkt():
                         existing_data.add((row[1], row[2], row[3]))
 
         new_entries = 0
+        file_exists = os.path.isfile(file_name) and os.stat(file_name).st_size > 0
+        
         with open(file_name, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            if not os.path.isfile(file_name) or os.stat(file_name).st_size == 0:
+            if not file_exists:
                 writer.writerow(['Date', 'Match', 'Pari', 'Cote'])
 
-            # Ici on simule l'extraction (à adapter selon le code HTML exact de TM)
-            # Pour l'instant, on va juste logger qu'on a réussi à lire la page
-            if response.status_code == 200:
-                print("Accès à Transfermarkt réussi !")
-                # Si tu vois ce message dans les logs, on affinera le sélecteur HTML
+            for item in boost_items:
+                # On ne prend que Winamax
+                if "winamax" in str(item).lower():
+                    try:
+                        # Extraction des infos (basée sur la structure type de TM)
+                        match = item.select_one('.bet-boost-event').text.strip()
+                        pari = item.select_one('.bet-boost-market').text.strip()
+                        cote = item.select_one('.bet-boost-odds').text.strip()
+                        
+                        if (match, pari, cote) not in existing_data:
+                            writer.writerow([
+                                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                match,
+                                pari,
+                                cote
+                            ])
+                            new_entries += 1
+                    except:
+                        continue
+        
+        print(f"Succès : {new_entries} nouveaux boosts Winamax ajoutés.")
         
     except Exception as e:
         print(f"Erreur : {e}")
