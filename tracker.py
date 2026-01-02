@@ -16,8 +16,7 @@ def track_all_boosts():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # On cible tous les blocs de boosts
-        # (Le script s'adapte à la structure visuelle de la page)
+        # Sélection des blocs de boosts
         boost_items = soup.select('.bet-boost-item') 
         
         existing_data = set()
@@ -26,9 +25,9 @@ def track_all_boosts():
                 reader = csv.reader(f)
                 next(reader, None)
                 for row in reader:
-                    if len(row) >= 4:
-                        # Clé unique : Match + Pari + Cote
-                        existing_data.add((row[1], row[2], row[3]))
+                    if len(row) >= 5:
+                        # On stocke : Bookmaker + Match + Pari + Cote
+                        existing_data.add((row[1], row[2], row[3], row[4]))
 
         new_entries = 0
         file_exists = os.path.isfile(file_name) and os.stat(file_name).st_size > 0
@@ -36,21 +35,28 @@ def track_all_boosts():
         with open(file_name, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             if not file_exists:
-                writer.writerow(['Date', 'Match', 'Pari', 'Cote'])
+                writer.writerow(['Date', 'Bookmaker', 'Match', 'Pari', 'Cote'])
 
             for item in boost_items:
                 try:
-                    # Extraction générique
+                    # Extraction des données
                     match = item.select_one('.bet-boost-event').text.strip()
                     pari = item.select_one('.bet-boost-market').text.strip()
-                    cote = item.select_one('.bet-boost-odds').text.strip()
+                    cote = item.select_one('.bet-boost-odds').text.strip().replace('Cote', '').strip()
                     
-                    # Nettoyage de la cote (enlève "Cote" ou les espaces inutiles)
-                    cote = cote.replace('Cote', '').strip()
+                    # On devine le bookmaker via l'image ou le texte
+                    bookmaker = "Inconnu"
+                    img_alt = item.select_one('img')['alt'].lower() if item.select_one('img') else ""
+                    if "winamax" in img_alt or "winamax" in str(item).lower(): bookmaker = "Winamax"
+                    elif "unibet" in img_alt or "unibet" in str(item).lower(): bookmaker = "Unibet"
+                    elif "betclic" in img_alt or "betclic" in str(item).lower(): bookmaker = "Betclic"
+                    elif "pmu" in img_alt or "pmu" in str(item).lower(): bookmaker = "PMU"
+                    elif "parions" in img_alt or "parions" in str(item).lower(): bookmaker = "ParionsSport"
                     
-                    if (match, pari, cote) not in existing_data:
+                    if (bookmaker, match, pari, cote) not in existing_data:
                         writer.writerow([
                             datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            bookmaker,
                             match,
                             pari,
                             cote
@@ -59,7 +65,7 @@ def track_all_boosts():
                 except:
                     continue
         
-        print(f"Succès : {new_entries} nouveaux boosts ajoutés au total.")
+        print(f"Succès : {new_entries} nouveaux boosts ajoutés.")
         
     except Exception as e:
         print(f"Erreur : {e}")
