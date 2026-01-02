@@ -7,18 +7,12 @@ from datetime import datetime
 def track_all_boosts():
     url = "https://www.transfermarkt.fr/paris-sportifs/cotes-boostees"
     file_name = "historique_boosts.csv"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
 
     try:
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # On cherche tous les blocs de texte qui contiennent "Cote"
-        # C'est la méthode la plus sûre par rapport à tes screens
-        all_texts = soup.find_all(text=True)
+        all_texts = soup.find_all(string=True)
         
         existing_data = set()
         if os.path.isfile(file_name):
@@ -35,38 +29,27 @@ def track_all_boosts():
         with open(file_name, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             if not file_exists:
-                writer.writerow(['Date', 'Bookmaker', 'Match', 'Pari', 'Cote'])
+                # Ajout des colonnes Statut et Gain Net
+                writer.writerow(['Date', 'Bookmaker', 'Match', 'Pari', 'Cote', 'Statut', 'Gain Net'])
 
             for text in all_texts:
                 if "Cote" in text and len(text) > 10:
                     try:
-                        # On nettoie le texte (ex: "Toulouse - Lens : ... Cote 3.25")
                         clean_text = text.strip().replace('\n', ' ')
                         parts = clean_text.split("Cote")
                         pari_complet = parts[0].strip().strip(':')
                         cote_valeur = parts[1].strip()
-
-                        # On cherche le bookmaker autour du texte
                         parent = text.parent.parent.parent
                         img = parent.find('img')
                         bookmaker = img['alt'] if img and img.has_attr('alt') else "Inconnu"
 
                         if (bookmaker, "Boost", pari_complet, cote_valeur) not in existing_data:
-                            writer.writerow([
-                                datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                bookmaker,
-                                "Boost",
-                                pari_complet,
-                                cote_valeur
-                            ])
+                            # On laisse Statut et Gain Net vides ('')
+                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M"), bookmaker, "Boost", pari_complet, cote_valeur, '', ''])
                             new_entries += 1
-                    except:
-                        continue
-        
+                    except: continue
         print(f"Succès : {new_entries} nouveaux boosts détectés.")
-        
-    except Exception as e:
-        print(f"Erreur : {e}")
+    except Exception as e: print(f"Erreur : {e}")
 
 if __name__ == "__main__":
     track_all_boosts()
