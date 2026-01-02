@@ -4,7 +4,7 @@ import csv
 import os
 from datetime import datetime
 
-def track_transfermarkt():
+def track_all_boosts():
     url = "https://www.transfermarkt.fr/paris-sportifs/cotes-boostees"
     file_name = "historique_boosts.csv"
     
@@ -16,8 +16,8 @@ def track_transfermarkt():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # On cible les conteneurs de boosts Winamax
-        # Note : On cherche les div qui contiennent le logo Winamax ou le texte associé
+        # On cible tous les blocs de boosts
+        # (Le script s'adapte à la structure visuelle de la page)
         boost_items = soup.select('.bet-boost-item') 
         
         existing_data = set()
@@ -27,6 +27,7 @@ def track_transfermarkt():
                 next(reader, None)
                 for row in reader:
                     if len(row) >= 4:
+                        # Clé unique : Match + Pari + Cote
                         existing_data.add((row[1], row[2], row[3]))
 
         new_entries = 0
@@ -38,29 +39,30 @@ def track_transfermarkt():
                 writer.writerow(['Date', 'Match', 'Pari', 'Cote'])
 
             for item in boost_items:
-                # On ne prend que Winamax
-                if "winamax" in str(item).lower():
-                    try:
-                        # Extraction des infos (basée sur la structure type de TM)
-                        match = item.select_one('.bet-boost-event').text.strip()
-                        pari = item.select_one('.bet-boost-market').text.strip()
-                        cote = item.select_one('.bet-boost-odds').text.strip()
-                        
-                        if (match, pari, cote) not in existing_data:
-                            writer.writerow([
-                                datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                match,
-                                pari,
-                                cote
-                            ])
-                            new_entries += 1
-                    except:
-                        continue
+                try:
+                    # Extraction générique
+                    match = item.select_one('.bet-boost-event').text.strip()
+                    pari = item.select_one('.bet-boost-market').text.strip()
+                    cote = item.select_one('.bet-boost-odds').text.strip()
+                    
+                    # Nettoyage de la cote (enlève "Cote" ou les espaces inutiles)
+                    cote = cote.replace('Cote', '').strip()
+                    
+                    if (match, pari, cote) not in existing_data:
+                        writer.writerow([
+                            datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            match,
+                            pari,
+                            cote
+                        ])
+                        new_entries += 1
+                except:
+                    continue
         
-        print(f"Succès : {new_entries} nouveaux boosts Winamax ajoutés.")
+        print(f"Succès : {new_entries} nouveaux boosts ajoutés au total.")
         
     except Exception as e:
         print(f"Erreur : {e}")
 
 if __name__ == "__main__":
-    track_transfermarkt()
+    track_all_boosts()
