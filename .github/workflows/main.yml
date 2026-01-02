@@ -2,8 +2,11 @@ name: Winamax Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *' # S'exécute toutes les heures
-  workflow_dispatch: # Permet de le lancer à la main pour tester
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Donne le droit d'écrire le fichier CSV
 
 jobs:
   build:
@@ -27,6 +30,6 @@ jobs:
         run: |
           git config --global user.name 'Tracker Bot'
           git config --global user.email 'bot@github.com'
-          git add historique_boosts.csv
-          git commit -m "Auto-update cotes" || exit 0
+          git add historique_boosts.csv || echo "Rien à ajouter"
+          git commit -m "Auto-update cotes" || echo "Rien à commit"
           git push
