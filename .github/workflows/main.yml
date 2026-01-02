@@ -2,11 +2,11 @@ name: Winamax Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *' # S'exécute toutes les heures
+  workflow_dispatch: # Permet de le lancer manuellement pour tester
 
 permissions:
-  contents: write  # Donne le droit d'écrire le fichier CSV
+  contents: write
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests beautifulsoup4
 
       - name: Run script
         run: python tracker.py
@@ -30,6 +30,6 @@ jobs:
         run: |
           git config --global user.name 'Tracker Bot'
           git config --global user.email 'bot@github.com'
-          git add historique_boosts.csv || echo "Rien à ajouter"
-          git commit -m "Auto-update cotes" || echo "Rien à commit"
+          git add historique_boosts.csv || echo "Aucun fichier à ajouter"
+          git commit -m "Auto-update cotes $(date +'%Y-%m-%d %H:%M')" || echo "Rien à commit"
           git push
